@@ -4,10 +4,11 @@ let
   inherit (pkgs) lib;
   workspace = builtins.pathExists (src + "/meson.build");
   selectMember = workspace && memberPath != ".";
-  cache = pkgs.linkFarm "meson-packagecache" (lib.mapAttrsToList (name: archive: {
+  cache = (pkgs.linkFarm "meson-packagecache" (lib.mapAttrsToList (name: archive: {
     inherit name; path = pkgs.fetchurl { inherit name; inherit (archive) urls sha256; };
-  }) plan.archives);
+  }) plan.archives)).overrideAttrs { __contentAddressed = true; };
   package = pkgs.stdenv.mkDerivation {
+    __contentAddressed = true;
     name = "${builderName}-meson";
     src = if workspace then src else builtins.path {
       path = src + "/${memberPath}"; name = "project-source";
@@ -52,7 +53,7 @@ let
       cat "$TMPDIR/member-program" > "$out/nix-support/${builderName}-program"
     '';
   };
-in if !selectMember || test then package else pkgs.runCommand "${builderName}-member" {} ''
+in if !selectMember || test then package else pkgs.runCommand "${builderName}-member" { __contentAddressed = true; } ''
   read -r program < ${package}/nix-support/${builderName}-program
   test -x "$program"
   mkdir -p "$out/bin"

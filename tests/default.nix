@@ -15,6 +15,7 @@ let
   workspace = self.lib.mkMonorepoFlake { inherit commands srcForTarget; };
   apps = workspace.apps.${system};
 in pkgs.runCommand "check-workspace" {
+  __contentAddressed = true;
   memberTests = builtins.attrValues workspace.checks.${system};
 } ''
   test "$(${apps.api.program})" = 'api drvlang'

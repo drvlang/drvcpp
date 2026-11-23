@@ -23,6 +23,9 @@ let
       if target == "" || target == null then targetFiles
       else builtins.intersectAttrs matchingTargets targetFiles));
   selectFiles = files != null && !(args ? srcForTarget) && !(src ? _isLibCleanSourceWith);
+  separate = args.separateSubprojects or config.separateSubprojects or {};
+  componentRoot = if builtins.pathExists (rootPath + "/meson.build") || target == "" || target == null || target == "."
+    then rootPath else pathFor (commands.${target} or target);
   defaults = lib.optionalAttrs (manifestData ? commands) { inherit (manifestData) commands; }
     // builtins.intersectAttrs { program = null; separateSubprojects = null; } config;
 in assert lib.assertMsg (!(args ? root && args ? src)) "${name}: supply either root or src";
@@ -32,6 +35,15 @@ in assert lib.assertMsg (!(args ? root && args ? src)) "${name}: supply either r
      "${name}: unknown field in the ${name} section of drvlang.json";
    defaults // removeAttrs args [ "root" ] // lib.optionalAttrs (src != null) {
      src = if selectFiles then projectSource { root = rootPath; files = map pathFor files; } else src;
+   } // lib.optionalAttrs (selectFiles && separate != {}) {
+     componentSrc = projectSource {
+       root = componentRoot;
+       files = map (n:
+         assert lib.assertMsg (builtins.match "[a-zA-Z0-9][a-zA-Z0-9_+.-]*" n != null)
+           "Expected a Meson subproject name, got ${builtins.toJSON n}";
+         componentRoot + "/subprojects/${n}"
+       ) (builtins.attrNames separate);
+     };
    } // {
      buildInputs = packages "libraries" ++ (args.buildInputs or []);
      nativeBuildInputs = packages "tools" ++ (args.nativeBuildInputs or []);

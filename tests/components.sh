@@ -30,11 +30,19 @@ before=$(package)
 "$cli" test -C .
 base=$(library "$before" base)
 greeting=$(library "$before" greeting)
+nix path-info --json "$before" "$(realpath "$before")" "$base" "$greeting" |
+  jq -e 'all(.[]; .ca | startswith("fixed:r:sha256:"))'
 echo docs > notes.md
 [[ $(package) == "$before" ]]
+echo '/* base edit with identical compiled bytes */' >> subprojects/base/base.c
+[[ $(package 2> "$scratch/noop.log") == "$before" ]]
+if grep -Eq "^building '.*-$builder-(greeting-meson|meson)\.drv'" "$scratch/noop.log"; then
+  cat "$scratch/noop.log" >&2
+  exit 1
+fi
 echo '/* client edit */' >> main.c
 after=$(package)
-[[ $before != "$after" && $(library "$after" base) == "$base" && $(library "$after" greeting) == "$greeting" ]]
+[[ $before == "$after" ]]
 sed 's/+ 1/+ 2/' subprojects/greeting/greeting.c > changed.c
 mv changed.c subprojects/greeting/greeting.c
 edited=$(package)
@@ -46,7 +54,10 @@ edited_base=$(package)
 if "$cli" test -C . --options '{"separateSubprojects":{"base":{"dependsOn":["greeting"]},"greeting":{"dependsOn":["base"]}}}' > failure.log 2>&1; then exit 1; fi
 grep -q 'dependency cycle' failure.log
 if "$cli" build -C . --no-link --options '{"mesonFlags":["--force-fallback-for=greeting"]}' > failure.log 2>&1; then exit 1; fi
-grep -q 'configured these separateSubprojects again: greeting' failure.log
+if ! grep -Eq 'configured these separateSubprojects again: greeting|Attempted to resolve subproject without subprojects directory present' failure.log; then
+  cat failure.log >&2
+  exit 1
+fi
 
 # Independent Meson projects share a checkout but no root meson.build.
 cd "$scratch"

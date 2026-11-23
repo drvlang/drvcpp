@@ -7,6 +7,7 @@ let
     mesonFlags = [ "-Dtests=enabled" ];
   };
 in pkgs.runCommand "drvcpp-openh264-codec" {
+  __contentAddressed = true;
   nativeBuildInputs = [ pkgs.stdenv.cc pkgs.pkg-config ];
   buildInputs = [ codec ];
 } ''

@@ -46,14 +46,14 @@ If an application uses an independently installable Meson project under `subproj
 ```json
 {
   "drvcpp": {
-    "files": ["meson.build", "check.cpp", "subprojects/openh264"],
+    "files": ["meson.build", "check.cpp"],
     "tools": ["nasm"],
     "separateSubprojects": { "openh264": { "mesonFlags": ["-Dtests=disabled"] } }
   }
 }
 ```
 
-`drvcpp build` and `drvcpp test` now reuse the installed codec when only `check.cpp` changes. A flake can read the same settings with `drvcpp.lib.mkFlake { root = ./.; }`. The same `separateSubprojects` map is accepted as a Nix argument or in CLI `--options`. In a monorepo, `files` and `targetFiles` also filter CLI inputs by command.
+`drvcpp build` and `drvcpp test` reuse the installed codec when only `check.cpp` changes. All compiled outputs and checks are content-addressed by default. An edit that installs identical codec files and store references can also reuse the client. With manifest file selection, the builder reads each declared component from its own directory. Include a component header, version file, or asset in `files` if the parent reads it directly. A flake reads the same manifest with `drvcpp.lib.mkFlake { root = ./.; }`. In a monorepo, `files` and `targetFiles` also filter CLI inputs by command.
 
 Use this for checked-in, self-contained Meson projects that export an installed dependency, such as a pkg-config library. Each entry builds with its own Meson flags. Set any options the parent normally passes to the fallback. Use `"dependsOn": ["base"]` for a library that consumes another selected component. Nix caches each installed library separately and rebuilds its consumers when it changes. Wrap-only dependencies and in-tree `subdir()` targets keep their existing build behavior. [Two-library example](tests/components)
 

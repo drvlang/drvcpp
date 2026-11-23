@@ -1,4 +1,5 @@
 pkgs: pkgs.rustPlatform.buildRustPackage {
+  __contentAddressed = true;
   pname = "drvcpp-plan";
   version = "0.1.0";
   src = ./planner;

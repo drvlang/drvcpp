@@ -1,6 +1,6 @@
 { drvkit, test ? false, name ? "drvcpp" }:
 pkgs: { src, memberPath ? ".", mesonFlags ? [], nativeBuildInputs ? [], buildInputs ? [],
-        doCheck ? true, testSuite ? null, testArgs ? [], separateSubprojects ? {} }:
+        doCheck ? true, testSuite ? null, testArgs ? [], separateSubprojects ? {}, componentSrc ? null }:
 let
   inherit (pkgs) lib;
   dynamic = import (drvkit + "/dynamic.nix") { inherit pkgs; };
@@ -19,8 +19,9 @@ dynamic {
     if [[ ! -f "$root/meson.build" ]]; then echo "${name}: missing meson.build in $root" >&2; exit 1; fi
     ${planner}/bin/drvcpp-plan "$root"/subprojects/*.wrap > plan.json
     ${lib.optionalString (names != []) ''
+      componentRoot=${if componentSrc == null then ''"$root"'' else lib.escapeShellArg (toString componentSrc)}
       for name in ${lib.escapeShellArgs names}; do
-        dir="$root/subprojects/$name"
+        dir="$componentRoot/subprojects/$name"
         if [[ ! -f "$dir/meson.build" ]]; then
           echo "separateSubprojects: expected a local Meson project in subprojects/$name" >&2
           exit 1
@@ -35,6 +36,7 @@ dynamic {
     in ${if names == [] then "build" else ''(import ${./components.nix} {
       inherit pkgs build;
       plans = ./.;
+      componentSrc = ${if componentSrc == null then "null" else ''builtins.storePath "${componentSrc}"''};
       components = builtins.fromJSON ${lib.strings.escapeNixString (builtins.toJSON separateSubprojects)};
     })''} {
       builderName = ${lib.strings.escapeNixString name};

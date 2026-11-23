@@ -1,9 +1,9 @@
 # Evaluated by the recursive planner after the selected source is realized.
-{ pkgs, build, plans, components }:
+{ pkgs, build, plans, components, componentSrc }:
 args:
 let
   inherit (pkgs) lib;
-  root = if builtins.pathExists (args.src + "/meson.build") then args.src
+  root = if componentSrc != null then componentSrc else if builtins.pathExists (args.src + "/meson.build") then args.src
          else args.src + "/${args.memberPath}";
   names = builtins.attrNames components;
   specFor = name: { dependsOn ? [], mesonFlags ? [] }:
