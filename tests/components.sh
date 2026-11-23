@@ -92,6 +92,8 @@ cat > flake.nix <<NIX
 NIX
 nix flake lock
 system=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+[[ $(nix eval --raw "path:$PWD#packages.$system.one.planner.drvPath") == \
+   "$(nix eval --raw "path:$PWD#checks.$system.one.planner.drvPath")" ]]
 recipes() { nix eval --raw "path:$PWD#$1.$system.$2.drvPath"; }
 one=$(recipes packages one)
 check=$(recipes checks one)

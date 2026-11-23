@@ -27,7 +27,6 @@ let
     inherit (spec) mesonFlags;
     buildInputs = map (dep: libraries.${dep}) deps ++ args.buildInputs;
     externalSubprojects = deps;
-    test = false;
     testSuite = null;
     testArgs = [];
   }) specs;

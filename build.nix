@@ -1,5 +1,5 @@
 { pkgs, darwinFixup ? null }:
-{ src, memberPath, plan, mesonFlags, nativeBuildInputs, buildInputs, doCheck, test, testSuite,
+{ src, memberPath, plan, mesonFlags, nativeBuildInputs, buildInputs, doCheck, testSuite,
         testArgs, builderName, externalSubprojects ? [] }:
 let
   inherit (pkgs) lib;
@@ -49,16 +49,11 @@ let
         mapfile -t mesonCheckFlagsArray < "$TMPDIR/member-tests"
       fi
     '';
-    postInstall = lib.optionalString (selectMember && !test) ''
+    postInstall = lib.optionalString selectMember ''
       mkdir -p "$out/nix-support"
       cat "$TMPDIR/member-program" > "$out/nix-support/${builderName}-program"
     '';
   } // lib.optionalAttrs (darwinFixup != null) {
     postFixup = "source ${darwinFixup}";
   });
-in if !selectMember || test then package else pkgs.runCommand "${builderName}-member" { __contentAddressed = true; } ''
-  read -r program < ${package}/nix-support/${builderName}-program
-  test -x "$program"
-  mkdir -p "$out/bin"
-  ln -s "$program" "$out/bin/"
-''
+in package

@@ -39,6 +39,8 @@ Use `nix build .#api`, `nix run .#worker` and `nix flake check`. For CLI target 
 
 Read that same map in the flake with `commands = (builtins.fromJSON (builtins.readFile ./drvlang.json)).commands;`.
 
+On x86-64 Linux, CI can request a member and its check together with `nix build --no-link .#api .#checks.x86_64-linux.api`. With the default test settings, both use one Meson configuration, compilation and test run.
+
 ## Cache a compiled library across application edits
 
 If an application uses an independently installable Meson project under `subprojects/`, give it its own Nix derivation. For a client that calls `dependency('openh264', fallback: ['openh264', 'openh264_dep'])`, put this in `drvlang.json`:
