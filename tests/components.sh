@@ -30,12 +30,22 @@ before=$(package)
 "$cli" test -C .
 base=$(library "$before" base)
 greeting=$(library "$before" greeting)
+if [[ $(uname -s) == Darwin && $(uname -m) == arm64 ]]; then
+  for binary in "$before/bin/client" "$base/lib/libbase.dylib" "$greeting/lib/libgreeting.dylib"; do
+    /usr/bin/codesign --verify --strict "$binary"
+  done
+fi
 nix path-info --json "$before" "$(realpath "$before")" "$base" "$greeting" |
   jq -e 'all(.[]; .ca | startswith("fixed:r:sha256:"))'
 echo docs > notes.md
 [[ $(package) == "$before" ]]
 echo '/* base edit with identical compiled bytes */' >> subprojects/base/base.c
-[[ $(package 2> "$scratch/noop.log") == "$before" ]]
+noop=$(package 2> "$scratch/noop.log")
+if [[ $noop != "$before" ]]; then
+  cat "$scratch/noop.log" >&2
+  echo "Comment edit changed $before to $noop" >&2
+  exit 1
+fi
 if grep -Eq "^building '.*-$builder-(greeting-meson|meson)\.drv'" "$scratch/noop.log"; then
   cat "$scratch/noop.log" >&2
   exit 1

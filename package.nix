@@ -32,7 +32,9 @@ dynamic {
   '';
   expression = ''
     let pkgs = import ${pkgs.path} { system = "${pkgs.stdenv.hostPlatform.system}"; };
-        build = import ${./build.nix} pkgs;
+        build = import ${./build.nix} { inherit pkgs;
+          ${lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''darwinFixup = builtins.storePath "${./fix-darwin-paths.sh}";''}
+        };
     in ${if names == [] then "build" else ''(import ${./components.nix} {
       inherit pkgs build;
       plans = ./.;

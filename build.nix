@@ -1,4 +1,5 @@
-pkgs: { src, memberPath, plan, mesonFlags, nativeBuildInputs, buildInputs, doCheck, test, testSuite,
+{ pkgs, darwinFixup ? null }:
+{ src, memberPath, plan, mesonFlags, nativeBuildInputs, buildInputs, doCheck, test, testSuite,
         testArgs, builderName, externalSubprojects ? [] }:
 let
   inherit (pkgs) lib;
@@ -7,7 +8,7 @@ let
   cache = (pkgs.linkFarm "meson-packagecache" (lib.mapAttrsToList (name: archive: {
     inherit name; path = pkgs.fetchurl { inherit name; inherit (archive) urls sha256; };
   }) plan.archives)).overrideAttrs { __contentAddressed = true; };
-  package = pkgs.stdenv.mkDerivation {
+  package = pkgs.stdenv.mkDerivation ({
     __contentAddressed = true;
     name = "${builderName}-meson";
     src = if workspace then src else builtins.path {
@@ -52,7 +53,9 @@ let
       mkdir -p "$out/nix-support"
       cat "$TMPDIR/member-program" > "$out/nix-support/${builderName}-program"
     '';
-  };
+  } // lib.optionalAttrs (darwinFixup != null) {
+    postFixup = "source ${darwinFixup}";
+  });
 in if !selectMember || test then package else pkgs.runCommand "${builderName}-member" { __contentAddressed = true; } ''
   read -r program < ${package}/nix-support/${builderName}-program
   test -x "$program"
