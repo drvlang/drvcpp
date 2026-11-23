@@ -6,10 +6,15 @@
   outputs = { self, nixpkgs, drvkit, ... }: let tools = import drvkit {
     inherit self nixpkgs;
     name = "drvcpp";
-    extraChecks = system: { benchmark = import ./benchmarks {
+    extraChecks = system: let args = {
       pkgs = nixpkgs.legacyPackages.${system}; inherit self system;
-    }; };
-    mkPackage = import ./package.nix;
+    }; in {
+      benchmark = import ./benchmarks args;
+      workspace = import ./tests args;
+    };
+    mkPackage = import ./package.nix { inherit drvkit; };
+    mkTest = import ./package.nix { inherit drvkit; test = true; };
+    selectTarget = { src, target, ... }: { inherit src; memberPath = target; };
   };
   in tools // {
     packages = nixpkgs.lib.mapAttrs (system: packages: packages // {

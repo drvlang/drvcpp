@@ -1,29 +1,34 @@
-pkgs: { src, mesonFlags ? [], nativeBuildInputs ? [], buildInputs ? [], doCheck ? true }:
+{ drvkit, test ? false }:
+pkgs: { src, memberPath ? ".", mesonFlags ? [], nativeBuildInputs ? [], buildInputs ? [],
+        doCheck ? true, testSuite ? null, testArgs ? [] }:
 let
   inherit (pkgs) lib;
-  subprojects = src + "/subprojects";
-  files = builtins.filter (f: lib.hasSuffix ".wrap" f) (builtins.attrNames (builtins.readDir subprojects));
-  wraps = pkgs.linkFarm "locked-meson-wraps" (map (name: {
-    inherit name; path = pkgs.writeText name (builtins.readFile (subprojects + ("/" + name)));
-  }) files);
+  dynamic = import (drvkit + "/dynamic.nix") { inherit pkgs; };
   planner = import ./planner.nix pkgs;
-  plan = builtins.fromJSON (builtins.readFile (pkgs.runCommand "drvcpp-plan.json" {} ''
-    ${planner}/bin/drvcpp-plan ${lib.concatMapStringsSep " " (f: "${wraps}/" + lib.escapeShellArg f) files} > "$out"
-  ''));
-  cache = pkgs.linkFarm "meson-packagecache" (lib.mapAttrsToList (name: archive: {
-    inherit name; path = pkgs.fetchurl { inherit name; inherit (archive) urls sha256; };
-  }) plan.archives);
-in
-assert lib.assertMsg (files != []) "drvcpp requires subprojects/*.wrap archive locks";
-pkgs.stdenv.mkDerivation {
-  name = "drvcpp-meson";
-  inherit src buildInputs doCheck;
-  nativeBuildInputs = [ pkgs.meson pkgs.ninja pkgs.pkg-config ] ++ nativeBuildInputs;
-  inherit mesonFlags;
-  mesonWrapMode = "nodownload";
-  postPatch = ''
-    rm -rf -- subprojects/packagecache ${lib.escapeShellArgs (map (d: "subprojects/" + d) plan.directories)}
-    mkdir -p subprojects/packagecache
-    cp -a ${cache}/. subprojects/packagecache/
+  inputs = deps: lib.concatMapStringsSep " "
+    (dep: "(builtins.storePath ${lib.strings.escapeNixString (toString (lib.getDev dep))})") deps;
+in dynamic {
+  name = if test then "drvcpp-test" else "drvcpp-package";
+  prepare = ''
+    shopt -s nullglob
+    root=${lib.escapeShellArg (toString src)}
+    if [[ ! -f "$root/meson.build" ]]; then root="$root/"${lib.escapeShellArg memberPath}; fi
+    if [[ ! -f "$root/meson.build" ]]; then echo "drvcpp: missing meson.build in $root" >&2; exit 1; fi
+    ${planner}/bin/drvcpp-plan "$root"/subprojects/*.wrap > plan.json
+  '';
+  expression = ''
+    let pkgs = import ${pkgs.path} { system = "${pkgs.stdenv.hostPlatform.system}"; };
+    in import ${./build.nix} pkgs {
+      src = builtins.storePath "${src}";
+      memberPath = ${lib.strings.escapeNixString memberPath};
+      plan = builtins.fromJSON (builtins.readFile ./plan.json);
+      mesonFlags = builtins.fromJSON ${lib.strings.escapeNixString (builtins.toJSON mesonFlags)};
+      testSuite = ${if testSuite == null then "null" else lib.strings.escapeNixString testSuite};
+      testArgs = builtins.fromJSON ${lib.strings.escapeNixString (builtins.toJSON testArgs)};
+      doCheck = ${lib.boolToString (doCheck || test)};
+      test = ${lib.boolToString test};
+      nativeBuildInputs = [ ${inputs nativeBuildInputs} ];
+      buildInputs = [ ${inputs buildInputs} ];
+    }
   '';
 }
