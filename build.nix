@@ -1,4 +1,4 @@
-pkgs: { src, memberPath, plan, mesonFlags, nativeBuildInputs, buildInputs, doCheck, test, testSuite, testArgs }:
+pkgs: { src, memberPath, plan, mesonFlags, nativeBuildInputs, buildInputs, doCheck, test, testSuite, testArgs, builderName }:
 let
   inherit (pkgs) lib;
   workspace = builtins.pathExists (src + "/meson.build");
@@ -7,7 +7,7 @@ let
     inherit name; path = pkgs.fetchurl { inherit name; inherit (archive) urls sha256; };
   }) plan.archives);
   package = pkgs.stdenv.mkDerivation {
-    name = "drvcpp-meson";
+    name = "${builderName}-meson";
     src = if workspace then src else src + "/${memberPath}";
     inherit buildInputs doCheck mesonFlags;
     nativeBuildInputs = [ pkgs.meson pkgs.ninja pkgs.pkg-config ] ++ nativeBuildInputs;
@@ -25,7 +25,7 @@ let
       ${pkgs.jq}/bin/jq -er --arg dir "$memberDir/meson.build" '
         [.[] | select(.defined_in == $dir and .type == "executable" and .installed) | .install_filename[]]
         | if length == 1 then .[0] else error("expected one installed executable defined in " + $dir) end
-      ' "$TMPDIR/targets.json" > "$TMPDIR/drvcpp-program"
+      ' "$TMPDIR/targets.json" > "$TMPDIR/member-program"
     '' + lib.optionalString (selectMember && testSuite == null && testArgs == [] && doCheck) ''
       meson introspect --tests . > "$TMPDIR/tests.json"
       ${pkgs.jq}/bin/jq -r --slurpfile targets "$TMPDIR/targets.json" \
@@ -40,11 +40,11 @@ let
     '';
     postInstall = lib.optionalString (selectMember && !test) ''
       mkdir -p "$out/nix-support"
-      cat "$TMPDIR/drvcpp-program" > "$out/nix-support/drvcpp-program"
+      cat "$TMPDIR/member-program" > "$out/nix-support/${builderName}-program"
     '';
   };
-in if !selectMember || test then package else pkgs.runCommand "drvcpp-member" {} ''
-  read -r program < ${package}/nix-support/drvcpp-program
+in if !selectMember || test then package else pkgs.runCommand "${builderName}-member" {} ''
+  read -r program < ${package}/nix-support/${builderName}-program
   test -x "$program"
   mkdir -p "$out/bin"
   ln -s "$program" "$out/bin/"

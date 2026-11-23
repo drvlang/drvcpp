@@ -17,6 +17,7 @@
     selectTarget = { src, target, ... }: { inherit src; memberPath = target; };
   };
   in tools // {
+    lib = tools.lib // { mesonBuilder = import ./package.nix; };
     packages = nixpkgs.lib.mapAttrs (system: packages: packages // {
       plan = import ./planner.nix nixpkgs.legacyPackages.${system};
     }) tools.packages;
