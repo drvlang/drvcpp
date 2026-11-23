@@ -41,7 +41,7 @@ fixDarwinPaths() {
   if (( ${#libraryDirs[@]} )); then
     mkdir -p "$out/nix-support"
     while IFS= read -r -d "" dir; do
-      printf 'export NIX_LDFLAGS+=" -rpath %s"\n' "$dir" >> "$out/nix-support/setup-hook"
+      printf 'export NIX_LDFLAGS+=%q\n' " -rpath $dir" >> "$out/nix-support/setup-hook"
     done < <(printf '%s\0' "${!libraryDirs[@]}" | sort -z)
     while IFS= read -r -d "" file; do
       sed -i '/^Libs:.*-L${libdir}/s/$/ -Wl,-rpath,${libdir}/' "$file"
