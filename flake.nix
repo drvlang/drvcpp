@@ -6,6 +6,11 @@
   outputs = { self, nixpkgs, drvkit, ... }: let tools = import drvkit {
     inherit self nixpkgs;
     name = "drvcpp";
+    projectArgs = import ./project.nix {
+      name = "drvcpp";
+      inherit (nixpkgs) lib legacyPackages;
+      inherit (tools.lib) projectSource;
+    };
     extraChecks = system: let args = {
       pkgs = nixpkgs.legacyPackages.${system}; inherit self system;
     }; in {
@@ -14,10 +19,19 @@
     };
     mkPackage = import ./package.nix { inherit drvkit; };
     mkTest = import ./package.nix { inherit drvkit; test = true; };
-    selectTarget = { src, target, ... }: { inherit src; memberPath = target; };
+    selectTarget = import ./select-target.nix nixpkgs.lib;
   };
   in tools // {
-    lib = tools.lib // { mesonBuilder = import ./package.nix; };
+    lib = tools.lib // {
+      mesonBuilder = import ./package.nix;
+      mesonProjectArgs = import ./project.nix;
+      mesonSelectTarget = import ./select-target.nix;
+      mkMonorepoFlake = args: tools.lib.mkMonorepoFlake (
+        nixpkgs.lib.optionalAttrs (args ? root && !(args ? commands)) {
+          commands = (builtins.fromJSON (builtins.readFile (args.root + "/drvlang.json"))).commands;
+        } // args
+      );
+    };
     packages = nixpkgs.lib.mapAttrs (system: packages: packages // {
       plan = import ./planner.nix nixpkgs.legacyPackages.${system};
     }) tools.packages;

@@ -1,0 +1,5 @@
+project('greeting', 'c', version: '1.0')
+base = dependency('base')
+greeting = library('greeting', 'greeting.c', dependencies: base, install: true)
+greeting_dep = declare_dependency(link_with: greeting)
+import('pkgconfig').generate(greeting)

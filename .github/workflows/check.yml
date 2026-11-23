@@ -14,3 +14,4 @@ jobs:
             extra-system-features = recursive-nix ca-derivations
             allow-import-from-derivation = false
       - run: nix flake check -L
+      - run: bash tests/components.sh

@@ -1,0 +1,9 @@
+{
+  "drvcpp": {
+    "files": ["meson.build", "main.c", "subprojects"],
+    "separateSubprojects": {
+      "base": {},
+      "greeting": { "dependsOn": ["base"] }
+    }
+  }
+}
