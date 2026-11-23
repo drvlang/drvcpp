@@ -7,7 +7,7 @@ let
   selectMember = workspace && memberPath != ".";
   cache = (pkgs.linkFarm "meson-packagecache" (lib.mapAttrsToList (name: archive: {
     inherit name; path = pkgs.fetchurl { inherit name; inherit (archive) urls sha256; };
-  }) plan.archives)).overrideAttrs { __contentAddressed = true; };
+  }) plan.archives)).overrideAttrs { __contentAddressed = true; allowSubstitutes = true; };
   package = pkgs.stdenv.mkDerivation ({
     __contentAddressed = true;
     name = "${builderName}-meson";
