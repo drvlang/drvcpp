@@ -17,8 +17,8 @@
       benchmark = import ./benchmarks args;
       workspace = import ./tests args;
     };
-    mkPackage = import ./package.nix { inherit drvkit; };
-    mkTest = import ./package.nix { inherit drvkit; test = true; };
+    mkPackage = import ./package.nix { inherit drvkit nixpkgs; };
+    mkTest = import ./package.nix { inherit drvkit nixpkgs; test = true; };
     selectTarget = import ./select-target.nix nixpkgs.lib;
   };
   in tools // {

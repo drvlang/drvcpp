@@ -1,8 +1,9 @@
-{ drvkit, test ? false, name ? "drvcpp" }:
+{ drvkit, nixpkgs ? null, test ? false, name ? "drvcpp" }:
 pkgs: { src, memberPath ? ".", mesonFlags ? [], nativeBuildInputs ? [], buildInputs ? [],
         doCheck ? true, testSuite ? null, testArgs ? [], separateSubprojects ? {}, componentSrc ? null }:
 let
   inherit (pkgs) lib;
+  nixpkgsSource = import (drvkit + "/nixpkgs-source.nix") pkgs nixpkgs;
   dynamic = import (drvkit + "/dynamic.nix") { inherit pkgs; };
   planner = import ./planner.nix pkgs;
   names = builtins.attrNames separateSubprojects;
@@ -30,7 +31,7 @@ let
       ''}
     '';
     expression = ''
-      let pkgs = import ${pkgs.path} { system = "${pkgs.stdenv.hostPlatform.system}"; };
+      let pkgs = import ${nixpkgsSource} { system = "${pkgs.stdenv.hostPlatform.system}"; };
           build = import ${./build.nix} { inherit pkgs;
             ${lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''darwinFixup = builtins.storePath "${./fix-darwin-paths.sh}";''}
           };
