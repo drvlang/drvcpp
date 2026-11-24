@@ -1,11 +1,11 @@
 # Resolve project-local settings before drvkit filters sources and selects a target.
-{ lib, projectSource, legacyPackages, name }:
+reader: { lib, projectSource, legacyPackages, name }:
 args:
 let
   src = args.src or args.root or null;
-  manifest = src + "/drvlang.json";
-  hasManifest = src != null && !lib.isDerivation src && builtins.pathExists manifest;
-  manifestData = if hasManifest then builtins.fromJSON (builtins.readFile manifest) else {};
+  source = reader lib src;
+  hasManifest = src != null && !source.generated && source.exists "drvlang.json";
+  manifestData = if hasManifest then builtins.fromJSON (source.readFile "drvlang.json") else {};
   config = manifestData.${name} or {};
   pkgs = legacyPackages.${args.system};
   packages = field: map (pkg: pkgs.${pkg} or (throw "${name}: unknown Nixpkgs package '${pkg}' in ${field}")) (config.${field} or []);
