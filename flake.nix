@@ -10,9 +10,8 @@
       toolSource = {
         root = ./.;
         files = [
-          ./build.nix ./components.nix ./fix-darwin-paths.sh ./package.nix ./planner.nix
-          ./planner/Cargo.toml ./planner/Cargo.lock ./planner/src ./project.nix
-          ./select-target.nix
+          ./drvcpp.py ./fix-darwin-paths.sh ./package.nix ./planner.nix
+          ./project.nix ./select-target.nix
         ];
         benchmarkFiles = [ ./benchmarks/default.nix ./benchmarks/source.nix ./benchmarks/check.cpp ];
       };

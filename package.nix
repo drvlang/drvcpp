@@ -1,71 +1,62 @@
-{ drvkit, nixpkgs ? null, test ? false, name ? "drvcpp" }:
+{ drvkit ? null, nixpkgs ? null, test ? false, name ? "drvcpp" }:
 pkgs: { src, memberPath ? ".", mesonFlags ? [], nativeBuildInputs ? [], buildInputs ? [],
         doCheck ? true, testSuite ? null, testArgs ? [], separateSubprojects ? {}, componentSrc ? null }:
 let
   inherit (pkgs) lib;
-  nixpkgsSource = import (drvkit + "/nixpkgs-source.nix") pkgs nixpkgs;
-  dynamic = import (drvkit + "/dynamic.nix") { inherit pkgs; };
-  planner = import ./planner.nix pkgs;
+  system = pkgs.stdenv.hostPlatform.system;
+  python = pkgs.python3;
+  script = ./drvcpp.py;
+  darwinFixup = if pkgs.stdenv.hostPlatform.isDarwin then ./fix-darwin-paths.sh else null;
   names = builtins.attrNames separateSubprojects;
   validName = n: builtins.match "[a-zA-Z0-9][a-zA-Z0-9_+.-]*" n != null;
-  inputs = deps: lib.concatMapStringsSep " "
-    (dep: "(builtins.storePath ${lib.strings.escapeNixString (toString (lib.getDev dep))})") deps;
-  install = dynamic {
-    name = "${name}-package";
-    prepare = ''
-      shopt -s nullglob
-      root=${lib.escapeShellArg (toString src)}
-      if [[ ! -f "$root/meson.build" ]]; then root="$root/"${lib.escapeShellArg memberPath}; fi
-      if [[ ! -f "$root/meson.build" ]]; then echo "${name}: missing meson.build in $root" >&2; exit 1; fi
-      ${planner}/bin/drvcpp-plan "$root"/subprojects/*.wrap > plan.json
-      ${lib.optionalString (names != []) ''
-        componentRoot=${if componentSrc == null then ''"$root"'' else lib.escapeShellArg (toString componentSrc)}
-        for name in ${lib.escapeShellArgs names}; do
-          dir="$componentRoot/subprojects/$name"
-          if [[ ! -f "$dir/meson.build" ]]; then
-            echo "separateSubprojects: expected a local Meson project in subprojects/$name" >&2
-            exit 1
-          fi
-          ${planner}/bin/drvcpp-plan "$dir"/subprojects/*.wrap > "component-$name.json"
-        done
-      ''}
-    '';
-    expression = ''
-      let pkgs = import ${nixpkgsSource} { system = "${pkgs.stdenv.hostPlatform.system}"; };
-          build = import ${./build.nix} { inherit pkgs;
-            ${lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''darwinFixup = builtins.storePath "${./fix-darwin-paths.sh}";''}
-          };
-      in ${if names == [] then "build" else ''(import ${./components.nix} {
-        inherit pkgs build;
-        plans = ./.;
-        componentSrc = ${if componentSrc == null then "null" else ''builtins.storePath "${componentSrc}"''};
-        components = builtins.fromJSON ${lib.strings.escapeNixString (builtins.toJSON separateSubprojects)};
-      })''} {
-        builderName = ${lib.strings.escapeNixString name};
-        src = builtins.storePath "${src}";
-        memberPath = ${lib.strings.escapeNixString memberPath};
-        plan = builtins.fromJSON (builtins.readFile ./plan.json);
-        mesonFlags = builtins.fromJSON ${lib.strings.escapeNixString (builtins.toJSON mesonFlags)};
-        testSuite = ${if testSuite == null then "null" else lib.strings.escapeNixString testSuite};
-        testArgs = builtins.fromJSON ${lib.strings.escapeNixString (builtins.toJSON testArgs)};
-        doCheck = ${lib.boolToString (doCheck || test)};
-        nativeBuildInputs = [ ${inputs nativeBuildInputs} ];
-        buildInputs = [ ${inputs buildInputs} ];
-      }
-    '';
+
+  config = {
+    src = "${src}";
+    inherit memberPath mesonFlags testSuite testArgs separateSubprojects;
+    builderName = name;
+    inherit system;
+    python = "${python}";
+    script = "${script}";
+    toolchain = {
+      stdenv = "${pkgs.stdenv}";
+      bash = "${pkgs.bashNonInteractive}";
+      meson = "${pkgs.meson}";
+      ninja = "${pkgs.ninja}";
+      pkgConfig = "${pkgs.pkg-config}";
+    };
+    darwinFixup = if darwinFixup == null then null else "${darwinFixup}";
+    nativeBuildInputs = map (d: "${lib.getDev d}") nativeBuildInputs;
+    buildInputs = map (d: "${lib.getDev d}") buildInputs;
+    doCheck = doCheck || test;
+    componentSrc = if componentSrc == null then null else "${componentSrc}";
   };
+
+  planner = builtins.derivation {
+    name = "${name}-package.drv";
+    inherit system;
+    builder = "${python}/bin/python3";
+    args = [ "-S" script "plan" ];
+    CONFIG_JSON = builtins.toJSON config;
+    requiredSystemFeatures = [ "recursive-nix" ];
+    __contentAddressed = true;
+    outputHashMode = "text";
+    outputHashAlgo = "sha256";
+  };
+
+  built = builtins.outputOf planner.outPath "out";
+  isMember = !test && memberPath != ".";
+
+  result = builtins.derivation ({
+    name = if isMember then "${name}-member" else "${name}-package";
+    inherit system;
+    builder = "${python}/bin/python3";
+    args = [ "-S" script (if isMember then "member" else "forward") ];
+    TARGET = built;
+    __contentAddressed = true;
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+  } // lib.optionalAttrs isMember {
+    BUILDER_NAME = name;
+  });
 in assert lib.assertMsg (lib.all validName names) "Expected Meson subproject names in separateSubprojects";
-if test || memberPath == "." then install else pkgs.runCommand "${name}-member" {
-  __contentAddressed = true;
-  passthru.planner = install.planner;
-} ''
-  if [[ -f ${install}/nix-support/${name}-program ]]; then
-    read -r program < ${install}/nix-support/${name}-program
-    test -x "$program"
-    mkdir -p "$out/bin"
-    ln -s "$program" "$out/bin/"
-  else
-    # A generated source may contain an independent project at memberPath.
-    ln -s ${install} "$out"
-  fi
-''
+result // { inherit planner; passthru = { inherit planner; }; }
